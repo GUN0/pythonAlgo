@@ -2,17 +2,15 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 
 class Signal:
-    def __init__(self, balance,cnst_blnc):
+    def __init__(self, balance):
         self.states = ['buy', 'sell', 'none']
         self.state = 'none'
         self.balance = balance
-        self.lotsize = None
-        # Get Initial Balance as a Constant For Profit Loss Calculation Difference
-        self.cnst_blnc = cnst_blnc
-        # Holder is Used to Store the Profit Loss Data 
-        self.holder = 0
-        # Holder2 is Used for storing Updated Balance (If Used the self.balance instead the P&L Ratio gets Affected Poorly)
-        self.holder2 = cnst_blnc
+        self.lotsize = 0
+        # Initial Balance is Used as a Constant For Calculating Final Balance
+        # Cannot Use self.balance Only Because The Balance Graph Goes to 0 When Buy Order Happens Because Using Whole Balance When Buying
+        self.initial_balance = balance 
+        self.pnl = 0
     
     def buy_order(self, price_buy):
         if self.state == 'none' or self.state == 'sell':
@@ -20,7 +18,8 @@ class Signal:
             self.state = 'buy'
             self.lotsize = self.balance // price_buy
             print('Lot Size:', int(self.lotsize))
-            self.holder2 = self.balance - self.lotsize * price_buy
+            self.initial_balance = self.balance - self.lotsize * price_buy
+            self.buy_price = price_buy
 
         else:
             None
@@ -29,14 +28,15 @@ class Signal:
         if self.state == 'buy':
             print('Sold at: {:.2f}'.format(price_sell))
             self.state = 'sell'
-            self.balance = self.holder2 + self.lotsize * price_sell
-            self.holder = self.balance - self.cnst_blnc
+            self.balance = self.initial_balance + self.lotsize * price_sell
+            self.pnl = (self.lotsize * price_sell) - (self.lotsize * self.buy_price)
             print('Balance: {:.2f}'.format(self.balance))
-            print("P&L = {:.2f}".format(self.holder))
+            print("P&L = {:.2f}".format(self.pnl))
             print('\n')
 
         else:
             None
+
 
     def get_state(self):
         return self.state
@@ -44,14 +44,13 @@ class Signal:
     def get_balance(self):
         return self.balance
 
-    def get_cnst_blnc(self):
-        return self.holder
+    def get_pnl(self):
+        return self.pnl
 
 
 initial_balance = 10000
-int_blc2 = initial_balance
 pnl = []
-signal = Signal(balance=initial_balance, cnst_blnc=int_blc2)
+signal = Signal(balance=initial_balance)
 symbol = "ANSGR.IS"
 start_date = "2022-01-01"
 end_date = "2023-01-01"
@@ -73,7 +72,8 @@ for i in range(len(data)):
         signal.sell_order(data['Adj Close'].iloc[i])
 
     balance_data.append(signal.get_balance())
-    pnl.append(signal.get_cnst_blnc())
+    pnl.append(signal.get_pnl())
+    
 
 fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
 
