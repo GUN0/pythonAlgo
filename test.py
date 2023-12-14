@@ -1,10 +1,12 @@
 import yfinance as yf
 import matplotlib.pyplot as plt
+import pandas
 
 class Signal:
-    def __init__(self, balance):
+    def __init__(self, balance, stock_data):
         self.states = ['buy', 'sell', 'none']
         self.state = 'none'
+        self.stock_data = stock_data
         self.balance = balance
         self.lotsize = 0
         # Initial Balance is Used as a Constant For Calculating Final Balance
@@ -21,9 +23,6 @@ class Signal:
             self.initial_balance = self.balance - self.lotsize * price_buy
             self.buy_price = price_buy
 
-        else:
-            None
-
     def sell_order(self, price_sell):
         if self.state == 'buy':
             print('Sold at: {:.2f}'.format(price_sell))
@@ -34,8 +33,18 @@ class Signal:
             print("P&L = {:.2f}".format(self.pnl))
             print('\n')
 
-        else:
-            None
+    def rsi(self, period):
+        close_diff = self.stock_data['Adj Close'].diff()
+        initial_average_gain = close_diff.clip(lower=0)
+        initial_average_lose = -1 * close_diff.clip(upper=0)
+        average_gain = initial_average_gain.rolling(window=period).mean()
+        average_lose = initial_average_lose.rolling(window=period).mean()
+
+        rs = average_gain / average_lose
+        rsi = 100 - (100 / (1 + rs))
+
+        return rsi
+
 
 
     def get_state(self):
@@ -50,15 +59,16 @@ class Signal:
 
 initial_balance = 10000
 pnl = []
-signal = Signal(balance=initial_balance)
 symbol = "ANSGR.IS"
 start_date = "2022-01-01"
 end_date = "2023-01-01"
 sma1 = 8
 sma2 = 21
 balance_data = []
-
+stock_data = []
+rsi = 0
 data = yf.download(symbol, start=start_date, end=end_date)
+signal = Signal(balance=initial_balance, stock_data=data)
 
 data['SMA1'] = data['Adj Close'].rolling(window=sma1).mean()
 data['SMA2'] = data['Adj Close'].rolling(window=sma2).mean()
@@ -73,6 +83,7 @@ for i in range(len(data)):
 
     balance_data.append(signal.get_balance())
     pnl.append(signal.get_pnl())
+    rsi = signal.rsi(14)
     
 
 fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
@@ -89,9 +100,14 @@ ax2.set_xlabel('Date')
 ax2.set_ylabel('Balance (USD)')
 ax2.legend()
 
-ax3.plot(data.index, pnl, label='P&L', linewidth=2, color='red')
+# ax3.plot(data.index, pnl, label='P&L', linewidth=2, color='red')
+# ax3.set_xlabel('Date')
+# ax3.set_ylabel('P&L (USD)')
+# ax3.legend()
+
+ax3.plot(data.index, rsi, label='RSI', linewidth=2, color='orange')
 ax3.set_xlabel('Date')
-ax3.set_ylabel('P&L (USD)')
+ax3.set_ylabel('RSI Data')
 ax3.legend()
 
 plt.show()
